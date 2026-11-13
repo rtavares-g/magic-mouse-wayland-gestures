@@ -73,7 +73,8 @@ Publishable Magic Mouse 2 Wayland integration: kernel pointer/buttons/middle cli
 - V37: Automated tests cover three-finger capability isolation, equal contact translation, stable-ID reset, and sequence locking. Live merge gate checks GNOME workspace left/right and overview up on the tested Magic Mouse 2.
 - V38: Three-finger virtual Y translation is inverted against Magic Mouse raw Y so physical up matches the tested GNOME touchpad up gesture. This conversion changes neither V16 one-finger scroll signs nor V10 two-finger Back/Forward mapping; horizontal three-finger direction is unchanged.
 - V39: The project udev rule sorts before systemd `73-seat-late.rules`, so the standard `uaccess` builtin sees the exact Magic Mouse tag on first device creation. Upgrade removes the obsolete late `99-` rule.
-- V40: The main service is enabled under and stopped with `graphical-session.target`; a lingering user manager cannot start the hidraw/uinput/ydotool pipeline before a local graphical login.
+- V40: The main service is enabled under `default.target`, not `graphical-session.target`, because labwc on Raspberry Pi OS never activates the latter. Early starts under a lingering user manager are absorbed by the bounded uinput ACL wait and unlimited ydotoold restarts.
+- V41: Both services use `ProtectHome=tmpfs` plus `BindPaths=%t`; `ProtectHome=true` also hides `/run/user`, so ydotoold could not bind its socket and Back/Forward key sends failed silently.
 
 §T
 

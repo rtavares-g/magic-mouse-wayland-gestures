@@ -146,11 +146,11 @@ The installer is fail-safe around scroll ownership:
 6. disables kernel scroll only after preflight succeeds;
 7. restores native live and persistent scroll settings if a later step fails.
 
-The service is part of `graphical-session.target`, so a lingering user manager
-cannot start it before the local desktop session exists. If logind grants
-`/dev/uinput` access a few seconds late inside that session, the service waits
-with bounded backoff instead of crashing; the dedicated ydotoold also retries
-without a systemd start-rate limit.
+The service is enabled under `default.target`, because some compositors (for
+example labwc on Raspberry Pi OS) never activate `graphical-session.target`.
+If the user manager starts before logind grants `/dev/uinput` access, the
+service waits with bounded backoff instead of crashing; the dedicated ydotoold
+also retries without a systemd start-rate limit.
 
 If the paired device name does not contain `Magic Mouse`, automatic Bluetooth
 reprobe is skipped. Power-cycle the mouse once after installation; the script

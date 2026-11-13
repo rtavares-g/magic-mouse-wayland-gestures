@@ -217,17 +217,16 @@ def test_v39_uaccess_rule_precedes_systemd_seat_acl_processing():
     assert '"$LEGACY_UDEV_FILE"' in uninstall_script
 
 
-def test_v40_service_starts_only_with_the_graphical_session():
+def test_v40_service_starts_with_the_default_target():
     repo_root = Path(__file__).resolve().parents[1]
     service = (
         repo_root / "systemd" / "magic-mouse-wayland-gestures.service"
     ).read_text(encoding="utf-8")
     install_script = (repo_root / "install.sh").read_text(encoding="utf-8")
 
-    assert "PartOf=graphical-session.target" in service
-    assert "After=graphical-session-pre.target" in service
-    assert "WantedBy=graphical-session.target" in service
-    assert "WantedBy=default.target" not in service
+    # labwc on Raspberry Pi OS never activates graphical-session.target.
+    assert "WantedBy=default.target" in service
+    assert "graphical-session" not in service
     assert 'systemctl --user reenable "$SERVICE_NAME"' in install_script
 
 
@@ -269,12 +268,15 @@ def test_v32_services_apply_hardening_without_private_devices():
     for setting in (
         "NoNewPrivileges=true",
         "ProtectSystem=strict",
-        "ProtectHome=true",
+        "ProtectHome=tmpfs",
+        "BindPaths=%t",
         "ProtectKernelTunables=true",
         "MemoryDenyWriteExecute=true",
     ):
         assert setting in services
     assert "PrivateDevices=true" not in services
+    # ProtectHome=true also hides /run/user, breaking the ydotoold socket.
+    assert "ProtectHome=true" not in services
     # Ubuntu's unprivileged user manager cannot apply this setting and exits
     # with 218/CAPABILITIES before either process starts.
     assert "ProtectKernelModules=true" not in services

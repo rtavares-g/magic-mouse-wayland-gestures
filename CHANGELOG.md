@@ -3,7 +3,10 @@
 ## Unreleased
 
 - Order the Magic Mouse udev rule before systemd seat ACL processing.
-- Start the gesture pipeline only as part of the local graphical session.
+- Enable the service under `default.target` so it autostarts on compositors
+  that never activate `graphical-session.target` (e.g. labwc).
+- Fix ydotoold socket bind failure: `ProtectHome=true` hid `/run/user`;
+  services now use `ProtectHome=tmpfs` with `BindPaths=%t`.
 - Trigger Back/Forward with a quick one-finger horizontal flick; two fingers
   are now pinch-only by default (`MIN_FINGERS`/`MAX_FINGERS` restore the old
   behavior).
