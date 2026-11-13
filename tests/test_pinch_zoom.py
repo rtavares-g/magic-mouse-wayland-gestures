@@ -244,7 +244,7 @@ def test_v22_runtime_swipe_locks_out_pinch_and_sends_back():
     arbiter = gestures.TwoFingerGestureArbiter(threshold_mm=2.0)
     key_sender = Mock(return_value=True)
 
-    with patch.object(
+    with patch.object(gestures, "MAX_FINGERS", 2), patch.object(
         gestures.time,
         "monotonic",
         side_effect=[1.0, 1.0, 1.2, 1.2],

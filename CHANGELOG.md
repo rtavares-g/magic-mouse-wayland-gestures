@@ -4,6 +4,9 @@
 
 - Order the Magic Mouse udev rule before systemd seat ACL processing.
 - Start the gesture pipeline only as part of the local graphical session.
+- Trigger Back/Forward with a quick one-finger horizontal flick; two fingers
+  are now pinch-only by default (`MIN_FINGERS`/`MAX_FINGERS` restore the old
+  behavior).
 
 ## 0.1.0 - 2026-08-12
 

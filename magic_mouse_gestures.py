@@ -103,8 +103,8 @@ SWIPE_VERTICAL_MAX = get_env_int('SWIPE_VERTICAL_MAX', 150)  # Max vertical move
 SWIPE_TIME_MAX = get_env_float('SWIPE_TIME_MAX', 0.5)        # Max swipe duration (seconds)
 SWIPE_VELOCITY_MIN = get_env_int('SWIPE_VELOCITY_MIN', 200)  # Min horizontal velocity (px/s)
 SCROLL_COOLDOWN = get_env_float('SCROLL_COOLDOWN', 0.25)     # Cooldown after scroll (seconds)
-MIN_FINGERS = get_env_int('MIN_FINGERS', 2)                  # Preserve one-finger native scrolling
-MAX_FINGERS = get_env_int('MAX_FINGERS', 2)                  # Max fingers (ignore >2)
+MIN_FINGERS = get_env_int('MIN_FINGERS', 1)                  # One-finger Back/Forward
+MAX_FINGERS = get_env_int('MAX_FINGERS', 1)                  # Two fingers stay pinch-only
 
 SCROLL_SPEED = max(0, min(63, get_env_int('SCROLL_SPEED', 22)))
 SCROLL_LOCK_RATIO = max(1.0, get_env_float('SCROLL_LOCK_RATIO', 1.5))
@@ -262,8 +262,11 @@ class TwoFingerGestureArbiter:
 
         if len(touches) != 2 or len(touch_ids) != 2:
             phase = "end" if self.mode == "pinch" else None
+            leaving_two_fingers = self._touch_ids is not None
             self.reset()
-            return PinchDecision(phase=phase, reset_swipe=True)
+            # Only a two-finger sequence ending invalidates swipe tracking;
+            # one-finger navigation keeps its own tracking across samples.
+            return PinchDecision(phase=phase, reset_swipe=leaving_two_fingers)
 
         if self._touch_ids != touch_ids:
             phase = "end" if self.mode == "pinch" else None
@@ -317,6 +320,7 @@ class ScrollAxisLock:
         self.lock_threshold = max(1, lock_threshold)
 
         self.axis: Optional[str] = None
+        self.suppressed = False
         self.touch_id: Optional[int] = None
         self.last_x: Optional[int] = None
         self.last_y: Optional[int] = None
@@ -332,6 +336,7 @@ class ScrollAxisLock:
     def reset(self, clear_acceleration: bool = False) -> None:
         """End current touch sequence without affecting the physical device."""
         self.axis = None
+        self.suppressed = False
         self.touch_id = None
         self.last_x = None
         self.last_y = None
@@ -368,6 +373,7 @@ class ScrollAxisLock:
             SCROLL_ACCEL_BASE / self._acceleration_divisor,
         )
         self._unlock()
+        self.suppressed = False
         self.touch_id = touch.id
         self.last_x = touch.x
         self.last_y = touch.y
@@ -418,6 +424,12 @@ class ScrollAxisLock:
             vertical_hi_res=hi_res_value,
         )
 
+    def suppress(self) -> None:
+        """Stop scrolling until the current one-finger contact ends."""
+        if self.touch_id is not None:
+            self.suppressed = True
+            self._unlock()
+
     def update(
         self,
         touches: List[Touch],
@@ -441,7 +453,7 @@ class ScrollAxisLock:
         self.last_x = touch.x
         self.last_y = touch.y
 
-        if delta_x == 0 and delta_y == 0:
+        if self.suppressed or (delta_x == 0 and delta_y == 0):
             return ScrollDelta()
 
         if self.axis is not None:
@@ -917,12 +929,13 @@ def process_touches(
         return None
 
     gesture = detect_gesture(touches, state)
-    if gesture == "swipe_left":
+    if gesture in ("swipe_left", "swipe_right"):
         gesture_arbiter.lock_swipe()
+        scroll_filter.suppress()
+    if gesture == "swipe_left":
         if key_sender(KEY_RIGHT):
             print("→ Forward")
     elif gesture == "swipe_right":
-        gesture_arbiter.lock_swipe()
         if key_sender(KEY_LEFT):
             print("← Back")
     return gesture
@@ -953,7 +966,7 @@ def _horizontal_swipe_direction(
 
 
 def detect_gesture(touches: List[Touch], state: GestureState) -> Optional[str]:
-    """Detect one deliberate two-finger horizontal navigation gesture."""
+    """Detect one deliberate horizontal navigation flick (one finger by default)."""
     now = time.monotonic()
     if now - state.last_gesture_time < 0.5:
         return None
@@ -1193,7 +1206,7 @@ def main() -> int:
             gesture_emitter.reset()
 
             print(f"Connected: {hidraw}")
-            print("One finger scrolls; two fingers pinch or navigate back/forward")
+            print("One finger scrolls or flicks back/forward; two fingers pinch")
             print("Three fingers use GNOME workspace and overview gestures")
             print("Press Ctrl+C to stop\n")
 

@@ -1,7 +1,7 @@
 # Magic Mouse Wayland Gestures
 
 Linux/Wayland integration for Apple Magic Mouse 2 that adds one-finger
-scrolling, two-finger Back/Forward, kernel-native middle click, smooth
+scrolling, one-finger Back/Forward, kernel-native middle click, smooth
 touchpad-style pinch zoom, and GNOME three-finger navigation.
 
 > [!IMPORTANT]
@@ -14,16 +14,22 @@ touchpad-style pinch zoom, and GNOME three-finger navigation.
 | Input | Result |
 |---|---|
 | One-finger vertical or horizontal movement | Sticky-axis high-resolution scroll |
-| Two-finger horizontal swipe | Back / Forward (`Alt+Left` / `Alt+Right`) |
+| Quick one-finger horizontal flick | Back / Forward (`Alt+Left` / `Alt+Right`) |
 | Two-finger spread or pinch | Native libinput/Wayland pinch gesture |
 | Three-finger swipe left or right | Switch GNOME workspace |
 | Three-finger swipe up | Open GNOME overview |
 | Physical click with one finger in the center zone | Kernel-native middle click |
 | Pointer movement and left/right click | Unchanged kernel behavior |
 
-Pinch and navigation share a locked gesture arbiter. Once a two-finger contact
-sequence becomes a pinch it cannot navigate, and once it becomes a swipe it
-cannot turn into a pinch until both contacts lift.
+Back/Forward uses one finger. Slow horizontal movement keeps scrolling
+horizontally; a quick, mostly horizontal flick (`SWIPE_THRESHOLD`,
+`SWIPE_TIME_MAX`, `SWIPE_VELOCITY_MIN`) navigates once and stops scrolling until
+the finger lifts. Two fingers are reserved for pinch. To restore the previous
+two-finger navigation, set `MIN_FINGERS=2` and `MAX_FINGERS=2` in the service
+environment (or `MAX_FINGERS=2` to accept either). When two-finger navigation is
+enabled, pinch and navigation share a locked gesture arbiter: once a contact
+sequence becomes a pinch it cannot navigate, and vice versa until both contacts
+lift.
 
 ## Exact tested setup
 
@@ -85,7 +91,7 @@ Magic Mouse 2
     ├── one finger → scroll-only uinput device
     ├── two-finger pinch → gesture-only multitouch uinput → libinput/Wayland
     ├── three-finger swipe → same gesture-only uinput → GNOME
-    └── two-finger swipe → dedicated keyboard-only ydotoold → Alt+Left/Right
+    └── one-finger flick → dedicated keyboard-only ydotoold → Alt+Left/Right
 ```
 
 The scroll device has no pointer axes or buttons. The gesture device has no

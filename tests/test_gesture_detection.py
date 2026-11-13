@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import magic_mouse_gestures as gestures
 
@@ -26,7 +26,19 @@ def make_state(finger_count: int) -> gestures.GestureState:
     )
 
 
-def test_one_finger_horizontal_motion_is_reserved_for_native_scroll():
+def test_short_one_finger_horizontal_motion_does_not_navigate():
+    state = make_state(finger_count=1)
+
+    with patch.object(gestures.time, "monotonic", return_value=1.2):
+        result = gestures.detect_gesture(
+            [make_touch(0, x=1150, y=1000)],
+            state,
+        )
+
+    assert result is None
+
+
+def test_deliberate_one_finger_horizontal_swipe_navigates():
     state = make_state(finger_count=1)
 
     with patch.object(gestures.time, "monotonic", return_value=1.2):
@@ -35,26 +47,22 @@ def test_one_finger_horizontal_motion_is_reserved_for_native_scroll():
             state,
         )
 
-    assert result is None
-    assert state.start_x is None
+    assert result == "swipe_right"
 
 
-def test_short_two_finger_horizontal_motion_does_not_navigate():
-    state = make_state(finger_count=2)
+def test_one_finger_vertical_scroll_does_not_navigate():
+    state = make_state(finger_count=1)
 
     with patch.object(gestures.time, "monotonic", return_value=1.2):
         result = gestures.detect_gesture(
-            [
-                make_touch(0, x=1150, y=1000),
-                make_touch(1, x=1150, y=1000),
-            ],
+            [make_touch(0, x=1250, y=1400)],
             state,
         )
 
     assert result is None
 
 
-def test_deliberate_two_finger_horizontal_swipe_navigates():
+def test_two_fingers_do_not_navigate_by_default():
     state = make_state(finger_count=2)
 
     with patch.object(gestures.time, "monotonic", return_value=1.2):
@@ -66,7 +74,65 @@ def test_deliberate_two_finger_horizontal_swipe_navigates():
             state,
         )
 
+    assert result is None
+    assert state.start_x is None
+
+
+def test_two_finger_navigation_remains_available_through_max_fingers():
+    state = make_state(finger_count=2)
+
+    with patch.object(gestures, "MAX_FINGERS", 2), patch.object(
+        gestures.time, "monotonic", return_value=1.2
+    ):
+        result = gestures.detect_gesture(
+            [
+                make_touch(0, x=1400, y=1000),
+                make_touch(1, x=1400, y=1000),
+            ],
+            state,
+        )
+
     assert result == "swipe_right"
+
+
+def test_one_finger_swipe_sends_back_and_stops_scroll_until_lift():
+    state = gestures.GestureState()
+    scroll_filter = gestures.ScrollAxisLock()
+    scroll_emitter = Mock()
+    gesture_emitter = Mock()
+    gesture_emitter.update_three_finger.return_value = False
+    arbiter = gestures.TwoFingerGestureArbiter()
+    key_sender = Mock(return_value=True)
+
+    def step(x, now):
+        with patch.object(gestures.time, "monotonic", return_value=now):
+            return gestures.process_touches(
+                [make_touch(0, x=x, y=1000)],
+                state,
+                scroll_filter,
+                scroll_emitter,
+                arbiter,
+                gesture_emitter,
+                key_sender,
+            )
+
+    assert step(1000, 1.0) is None
+    assert step(1400, 1.2) == "swipe_right"
+    key_sender.assert_called_once_with(gestures.KEY_LEFT)
+    assert scroll_filter.suppressed
+
+    scroll_emitter.reset_mock()
+    step(2000, 1.3)
+    step(2600, 1.4)
+    for call in scroll_emitter.emit.call_args_list:
+        assert not call.args[0].has_events()
+
+    with patch.object(gestures.time, "monotonic", return_value=1.5):
+        gestures.process_touches(
+            [], state, scroll_filter, scroll_emitter, arbiter,
+            gesture_emitter, key_sender,
+        )
+    assert not scroll_filter.suppressed
 
 
 def test_v17_sysfs_bitmap_detects_middle_click_capability():

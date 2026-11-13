@@ -8,7 +8,7 @@ Publishable Magic Mouse 2 Wayland integration: kernel pointer/buttons/middle cli
 - Physical pointer/buttons and middle click stay kernel-native.
 - No evdev grab, pointer/button re-emission, scroll subprocess, polling loop, or ydotool scroll.
 - Existing raw HID reader supplies touch samples; separate scroll-only and gesture-only uinput devices supply outputs.
-- One finger scrolls. Two fingers lock to either native pinch or browser Back/Forward for the full contact sequence.
+- One finger scrolls; a quick one-finger horizontal flick navigates Back/Forward. Two fingers are native pinch by default.
 - Exactly three fingers produce a native libinput swipe; GNOME owns workspace and overview behavior.
 - Defaults: speed 22, dominance ratio 1.5, unlock after 250 ms inactivity, acceleration enabled with about 2.3x maximum gain.
 - Kernel native scroll disabled only after both virtual output paths pass preflight.
@@ -36,14 +36,14 @@ Publishable Magic Mouse 2 Wayland integration: kernel pointer/buttons/middle cli
 
 - V1: Program never grabs physical input device and never emits pointer motion or buttons.
 - V2: Virtual uinput capabilities contain scroll axes only.
-- V3: Exactly one active touch may produce scroll; zero or two-plus touches produce none.
+- V3: Exactly one active touch may produce scroll; zero or two-plus touches produce none. A recognized one-finger Back/Forward flick suppresses scroll until that contact ends.
 - V4: Neutral state accumulates meaningful motion; locks only when one axis is at least `SCROLL_LOCK_RATIO` times other axis.
 - V5: Locked state emits selected axis only. Orthogonal jitter always zero. Axis cannot switch while locked.
 - V6: Finger lift unlocks immediately. Resting finger unlocks after `SCROLL_LOCK_TIMEOUT` without meaningful motion. Timeout never delays initial cardinal scrolling.
 - V7: Low-resolution and high-resolution wheel accumulators preserve sub-step motion and emit Linux wheel-compatible values.
 - V8: Speed default 22. Acceleration remains enabled but gain never exceeds `SCROLL_ACCEL_MAX` default 2.3.
 - V9: Scroll path performs no subprocess calls, sleeps, periodic timers, or work without incoming HID data.
-- V10: Existing two-finger Back/Forward recognition and ydotool keyboard-only behavior remain unchanged.
+- V10: Back/Forward recognition (thresholds, direction mapping, ydotool keyboard-only output) is unchanged except finger count: default `MIN_FINGERS=MAX_FINGERS=1`; two-finger navigation remains opt-in through those variables.
 - V11: uinput initialization failure exits clearly before native scroll is disabled during install/deploy preflight.
 - V12: Automated tests cover axis choice, jitter suppression, no mid-stream switch, timeout/lift release, finger-count isolation, acceleration cap, and scroll-only capabilities.
 - V13: Install is idempotent. Documented rollback re-enables kernel scroll and removes userspace scroll ownership.
@@ -55,7 +55,7 @@ Publishable Magic Mouse 2 Wayland integration: kernel pointer/buttons/middle cli
 - V19: `Magic Mouse Gesture Touchpad` is a second uinput device with type-B MT slots, `BTN_TOUCH`, finger-count tool keys, and `INPUT_PROP_POINTER`; it has no `EV_REL`, `BTN_LEFT`, `BTN_RIGHT`, or `BTN_MIDDLE`, and uses `max_effects=0`.
 - V20: Pinch may start only with exactly two stable touch IDs when finger-distance change is at least `PINCH_THRESHOLD_MM` and at least `PINCH_DOMINANCE` times centroid travel. Zero, one, or three-plus touches never emit pinch.
 - V21: Pinch output starts two tracking slots at scale 1, updates symmetric positions around a fixed center using absolute scale, and releases both slots on lift, ID change, reconnect, or shutdown.
-- V22: Pinch and Back/Forward are mutually exclusive for each two-finger contact sequence. Pinch suppresses ydotool navigation; recognized swipe locks out pinch until all contacts lift.
+- V22: When two-finger navigation is enabled, pinch and Back/Forward are mutually exclusive for each two-finger contact sequence. Pinch suppresses ydotool navigation; recognized swipe locks out pinch until all contacts lift.
 - V23: Preflight creates and closes both runtime uinput devices without reading their event nodes. Failure occurs before native scroll is disabled or middle-click reprobe begins.
 - V24: Automated tests cover middle-click configuration/order, pinch capability isolation, threshold/dominance, slot lifecycle, scale direction, finger-count isolation, and pinch-vs-swipe locking. Live verification checks `BTN_MIDDLE`, libinput `pointer gesture`, active service, and clean logs.
 - V25: Installer installs and reloads its exact udev rules before uinput preflight, but changes neither live nor persistent kernel scroll ownership until both virtual devices pass. It never requires membership in broad `input` group.
@@ -85,6 +85,7 @@ T4|x|Prepare clean public derivative with least-privilege transactional install,
 T5|x|Handle delayed boot-time uinput ACL without traceback or service restart|V11,V23,V24,V29,V31,V32,V33,I.magic_mouse_gestures.py,I.systemd/magic-mouse-wayland-gestures.service,I.systemd/magic-mouse-wayland-gestures-ydotool.service,I.tests
 T6|x|Add native three-finger GNOME workspace and overview gestures on Magic Mouse 2|V1,V3,V9,V10,V18,V22,V23,V24,V31,V34,V35,V36,V37,V38,I.magic_mouse_gestures.py,I./dev/uinput,I.python3-evdev,I.tests,I.README.md
 T7|x|Make Back/Forward boot lifecycle independent of linger startup and late udev tagging|V28,V29,V32,V33,V39,V40,I.udev/70-magic-mouse-wayland-gestures.rules,I.systemd/magic-mouse-wayland-gestures.service,I.install.sh,I.uninstall.sh,I.tests
+T8|x|Move Back/Forward to a one-finger flick without breaking scroll or pinch|V3,V10,V22,I.magic_mouse_gestures.py,I.tests,I.README.md
 
 §B
 
